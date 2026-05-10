@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระบบค้นหาและจัดการหน้าหนังสือลูกค้า</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* ซ่อน Scrollbar แต่ยังเลื่อนได้ สำหรับส่วนแสดงผลลัพธ์ */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* ป้องกัน iOS Zoom เมื่อ focus input */
+        input[type="text"] {
+            font-size: 16px !important; 
+        }
+    </style>
+</head>
+<body class="min-h-screen p-2 sm:p-4 md:p-6 lg:p-8 flex flex-col">
+
+    <div class="max-w-6xl w-full mx-auto flex-1 flex flex-col h-full">
+        
+        <!-- เมนูสลับหน้าต่าง (แสดงเฉพาะบนมือถือ/แท็บเล็ตแนวตั้ง) -->
+        <div class="lg:hidden flex bg-white rounded-xl shadow-sm p-1.5 mb-4 border border-gray-200 shrink-0">
+            <button id="tabSearch" class="flex-1 py-2.5 text-sm font-semibold rounded-lg bg-blue-50 text-blue-600 transition-colors">
+                <i class="fas fa-search mr-1"></i> ค้นหา
+            </button>
+            <button id="tabManage" class="flex-1 py-2.5 text-sm font-semibold rounded-lg text-gray-500 hover:text-gray-700 transition-colors">
+                <i class="fas fa-cog mr-1"></i> จัดการข้อมูล
+            </button>
+        </div>
+
+        <div class="flex-1 flex flex-col lg:flex-row gap-4 lg:gap-6 relative">
+            
+            <!-- ฝั่งซ้าย: ระบบค้นหา -->
+            <div id="panelSearch" class="flex-1 bg-white rounded-xl shadow-lg p-4 sm:p-6 flex flex-col h-[calc(100vh-8rem)] lg:h-[calc(100vh-4rem)]">
+                <div class="text-center mb-4 sm:mb-6 shrink-0">
+                    <div class="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-100 text-blue-600 mb-2 sm:mb-3">
+                        <i class="fas fa-search text-lg sm:text-xl"></i>
+                    </div>
+                    <h1 class="text-xl sm:text-2xl font-semibold text-gray-800 mb-1">ค้นหาข้อมูลลูกค้า</h1>
+                    <p class="text-xs sm:text-sm text-gray-500">พิมพ์ชื่อเพื่อดูเลขหน้าสมุด</p>
+                </div>
+
+                <div class="relative mb-3 sm:mb-4 shrink-0">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                    <input type="text" id="searchInput" 
+                        class="block w-full pl-10 pr-10 py-3 sm:py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50 focus:bg-white shadow-inner" 
+                        placeholder="พิมพ์ชื่อลูกค้า..." autocomplete="off">
+                    <button id="clearSearchBtn" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 hidden">
+                        <i class="fas fa-times-circle text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- พื้นที่แสดงผลการค้นหา -->
+                <div class="flex-1 overflow-y-auto hide-scrollbar bg-gray-50 rounded-xl border border-gray-100" id="searchScrollArea">
+                    <div id="searchResults" class="hidden">
+                        <ul id="resultsList" class="divide-y divide-gray-100"></ul>
+                    </div>
+                    
+                    <div id="noResults" class="hidden flex flex-col items-center justify-center py-12 text-gray-400 h-full">
+                        <i class="far fa-folder-open text-4xl sm:text-5xl mb-3 text-gray-300"></i>
+                        <p class="text-sm sm:text-base">ไม่พบข้อมูลลูกค้าที่ค้นหา</p>
+                    </div>
+                    
+                    <div id="emptySearchState" class="flex flex-col items-center justify-center py-12 text-gray-400 h-full">
+                         <i class="fas fa-book-open text-4xl sm:text-5xl mb-3 text-gray-200"></i>
+                         <p class="text-sm sm:text-base">พิมพ์ชื่อเพื่อเริ่มค้นหา</p>
+                    </div>
+                </div>
+                
+                <div class="mt-3 sm:mt-4 pt-3 border-t border-gray-100 text-center text-xs sm:text-sm text-gray-400 shrink-0">
+                    มีข้อมูลทั้งหมด <span id="totalCountDisplay" class="font-bold text-gray-600">0</span> รายการ
+                </div>
+            </div>
+
+            <!-- ฝั่งขวา: ระบบจัดการข้อมูล (แอดมิน) -->
+            <div id="panelManage" class="flex-1 bg-white rounded-xl shadow-lg p-4 sm:p-6 flex-col h-[calc(100vh-8rem)] lg:h-[calc(100vh-4rem)] hidden lg:flex lg:border-l-4 border-emerald-500 relative">
+                <div class="mb-4 sm:mb-6 flex justify-between items-start sm:items-center shrink-0">
+                    <div>
+                        <h2 class="text-lg sm:text-xl font-semibold text-gray-800 flex items-center"><i class="fas fa-cog text-emerald-500 mr-2"></i>จัดการข้อมูล</h2>
+                        <p class="text-xs text-gray-500 mt-1">เพิ่ม/แก้ไข/ลบ ข้อมูลลูกค้า</p>
+                    </div>
+                    <button id="exportBtn" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 py-1.5 px-3 rounded-lg transition-colors flex items-center shadow-sm" title="สำรองข้อมูลเป็นไฟล์">
+                        <i class="fas fa-download mr-1.5"></i> <span class="hidden sm:inline">สำรองข้อมูล</span><span class="sm:hidden">สำรอง</span>
+                    </button>
+                </div>
+
+                <!-- ฟอร์มเพิ่ม/แก้ไขข้อมูล -->
+                <form id="customerForm" class="mb-4 sm:mb-6 bg-emerald-50 p-3 sm:p-4 rounded-xl border border-emerald-100 shrink-0 shadow-inner">
+                    <input type="hidden" id="editId" value="">
+                    <h3 id="formTitle" class="text-sm font-semibold text-emerald-800 mb-3 flex items-center">
+                        <i class="fas fa-plus-circle mr-1.5"></i>เพิ่มลูกค้าใหม่
+                    </h3>
+                    
+                    <div class="flex flex-col sm:flex-row gap-3 mb-3">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1" for="nameInput">ชื่อลูกค้า</label>
+                            <input type="text" id="nameInput" required
+                                class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" 
+                                placeholder="เช่น บริษัท เอบีซี">
+                        </div>
+                        <div class="w-full sm:w-28">
+                            <label class="block text-xs font-medium text-gray-600 mb-1" for="pageInput">หน้าสมุด</label>
+                            <input type="text" id="pageInput" required
+                                class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" 
+                                placeholder="เช่น 15, 20-21">
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button type="submit" id="submitBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition-all shadow hover:shadow-md flex justify-center items-center">
+                            <i class="fas fa-save mr-1.5"></i> บันทึกข้อมูล
+                        </button>
+                        <button type="button" id="cancelEditBtn" class="hidden px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm transition-colors font-medium">
+                            ยกเลิก
+                        </button>
+                    </div>
+                </form>
+
+                <!-- รายการข้อมูลทั้งหมด -->
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-2 gap-2 shrink-0">
+                    <h3 class="text-sm font-semibold text-gray-700 hidden sm:block">ฐานข้อมูลทั้งหมด</h3>
+                    <div class="relative w-full sm:w-1/2 md:w-64">
+                        <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                            <i class="fas fa-filter text-gray-400 text-xs"></i>
+                        </div>
+                        <input type="text" id="filterDatabaseInput" class="w-full text-sm border border-gray-200 rounded-md pl-8 pr-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50" placeholder="ค้นหาในตาราง...">
+                    </div>
+                </div>
+                
+                <div class="flex-1 overflow-hidden border border-gray-200 rounded-xl flex flex-col bg-white">
+                    <div class="overflow-x-auto flex-1 hide-scrollbar">
+                        <table class="w-full text-sm text-left min-w-[400px]">
+                            <thead class="text-xs text-gray-600 uppercase bg-gray-100 sticky top-0 z-10">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3 font-semibold">ชื่อลูกค้า</th>
+                                    <th scope="col" class="px-4 py-3 w-20 text-center font-semibold">หน้า</th>
+                                    <th scope="col" class="px-4 py-3 w-24 text-center font-semibold">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="databaseTableBody" class="divide-y divide-gray-100">
+                                <!-- รายการข้อมูลทั้งหมดจะแสดงที่นี่ -->
+                            </tbody>
+                        </table>
+                        <div id="emptyDatabaseMsg" class="hidden p-8 text-center text-gray-400 text-sm flex flex-col items-center">
+                            <i class="fas fa-box-open text-3xl mb-2 text-gray-300"></i>
+                            <span>ยังไม่มีข้อมูล</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal สำหรับแสดงข้อความ (Custom Alert) -->
+    <div id="customModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl transform transition-all scale-95 opacity-0" id="modalContent">
+            <div class="flex items-center mb-3">
+                <div id="modalIcon" class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 shrink-0">
+                    <i class="fas fa-info"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900" id="modalTitle">แจ้งเตือน</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-6 leading-relaxed" id="modalMessage">ข้อความ</p>
+            <div class="flex justify-end gap-3" id="modalActions">
+                <button id="modalCancelBtn" class="hidden bg-gray-100 hover:bg-gray-200 text-gray-800 px-5 py-2.5 rounded-xl text-sm font-medium transition-colors">ยกเลิก</button>
+                <button id="modalConfirmBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-md">ตกลง</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- ส่วนจัดการหน้าจอ (Responsive Tabs) ---
+        const tabSearch = document.getElementById('tabSearch');
+        const tabManage = document.getElementById('tabManage');
+        const panelSearch = document.getElementById('panelSearch');
+        const panelManage = document.getElementById('panelManage');
+
+        function switchTab(tab) {
+            if(window.innerWidth >= 1024) return; // บนคอมพิวเตอร์ไม่ต้องสลับ (โชว์คู่)
+
+            if(tab === 'search') {
+                tabSearch.className = 'flex-1 py-2.5 text-sm font-semibold rounded-lg bg-blue-50 text-blue-600 transition-colors';
+                tabManage.className = 'flex-1 py-2.5 text-sm font-semibold rounded-lg text-gray-500 hover:text-gray-700 transition-colors';
+                
+                panelSearch.classList.remove('hidden');
+                panelSearch.classList.add('flex');
+                panelManage.classList.add('hidden');
+                panelManage.classList.remove('flex');
+            } else {
+                tabManage.className = 'flex-1 py-2.5 text-sm font-semibold rounded-lg bg-emerald-50 text-emerald-600 transition-colors';
+                tabSearch.className = 'flex-1 py-2.5 text-sm font-semibold rounded-lg text-gray-500 hover:text-gray-700 transition-colors';
+                
+                panelManage.classList.remove('hidden');
+                panelManage.classList.add('flex');
+                panelSearch.classList.add('hidden');
+                panelSearch.classList.remove('flex');
+            }
+        }
+
+        tabSearch.addEventListener('click', () => switchTab('search'));
+        tabManage.addEventListener('click', () => switchTab('manage'));
+
+        // ตรวจจับการยืดหดหน้าจอ
+        window.addEventListener('resize', () => {
+            if(window.innerWidth >= 1024) {
+                // จอใหญ่โชว์คู่เสมอ
+                panelSearch.classList.remove('hidden');
+                panelSearch.classList.add('flex');
+                panelManage.classList.remove('hidden');
+                panelManage.classList.add('flex');
+            } else {
+                // จอเล็กดูว่ากำลังกด tab ไหนอยู่
+                if(tabSearch.classList.contains('bg-blue-50')) {
+                    switchTab('search');
+                } else {
+                    switchTab('manage');
+                }
+            }
+        });
+
+
+        // ตัวแปรเก็บข้อมูลหลัก
+        let database = [];
+
+        // ฟังก์ชันโหลดข้อมูลจาก LocalStorage
+        function loadData() {
+            const savedData = localStorage.getItem('customerDatabase');
+            if (savedData) {
+                try {
+                    database = JSON.parse(savedData);
+                } catch (e) {
+                    console.error("Error parsing saved data", e);
+                    database = [];
+                }
+            } else {
+                // ข้อมูลตัวอย่างเริ่มต้น
+                database = [
+                    { id: generateId(), name: "บริษัท ตัวอย่าง จำกัด", page: "1" },
+                    { id: generateId(), name: "สมชาย ใจดี", page: "12" }
+                ];
+                saveData();
+            }
+            updateDatabaseUI();
+        }
+
+        // ฟังก์ชันบันทึกข้อมูลลง LocalStorage
+        function saveData() {
+            localStorage.setItem('customerDatabase', JSON.stringify(database));
+            document.getElementById('totalCountDisplay').textContent = database.length;
+        }
+
+        function generateId() {
+            return Math.random().toString(36).substr(2, 9);
+        }
+
+        const modal = document.getElementById('customModal');
+        const modalContent = document.getElementById('modalContent');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
+        const modalCancelBtn = document.getElementById('modalCancelBtn');
+        const modalIcon = document.getElementById('modalIcon');
+
+        let confirmCallback = null;
+
+        function showModal(title, message, type = 'info', callback = null) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            
+            // ปรับสีตามประเภท
+            if (type === 'danger' || type === 'confirm') {
+                modalIcon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                modalIcon.className = 'w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center mr-3 shrink-0';
+            } else if (type === 'success') {
+                modalIcon.innerHTML = '<i class="fas fa-check"></i>';
+                modalIcon.className = 'w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mr-3 shrink-0';
+            } else {
+                modalIcon.innerHTML = '<i class="fas fa-info"></i>';
+                modalIcon.className = 'w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 shrink-0';
+            }
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+
+            if (type === 'confirm') {
+                modalCancelBtn.classList.remove('hidden');
+                modalConfirmBtn.className = 'bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-md';
+                modalConfirmBtn.textContent = "ยืนยันลบ";
+            } else {
+                modalCancelBtn.classList.add('hidden');
+                modalConfirmBtn.className = 'bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-md';
+                modalConfirmBtn.textContent = "ตกลง";
+            }
+
+            confirmCallback = callback;
+        }
+
+        function closeModal() {
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                confirmCallback = null;
+            }, 200);
+        }
+
+        modalConfirmBtn.addEventListener('click', () => {
+            if (confirmCallback) confirmCallback();
+            closeModal();
+        });
+
+        modalCancelBtn.addEventListener('click', closeModal);
+
+
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        const searchResults = document.getElementById('searchResults');
+        const resultsList = document.getElementById('resultsList');
+        const noResults = document.getElementById('noResults');
+        const emptySearchState = document.getElementById('emptySearchState');
+
+        function performSearch(term) {
+            const cleanTerm = term.trim().toLowerCase();
+
+            if (term.length > 0) {
+                clearSearchBtn.classList.remove('hidden');
+            } else {
+                clearSearchBtn.classList.add('hidden');
+            }
+
+            if (cleanTerm === '') {
+                emptySearchState.classList.remove('hidden');
+                searchResults.classList.add('hidden');
+                noResults.classList.add('hidden');
+                return;
+            }
+
+            emptySearchState.classList.add('hidden');
+
+            const results = database.filter(item => item.name.toLowerCase().includes(cleanTerm));
+
+            if (results.length === 0) {
+                searchResults.classList.add('hidden');
+                noResults.classList.remove('hidden');
+            } else {
+                noResults.classList.add('hidden');
+                searchResults.classList.remove('hidden');
+                renderSearchResults(results);
+            }
+        }
+
+        function renderSearchResults(results) {
+            resultsList.innerHTML = '';
+            results.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'py-3 sm:py-4 flex justify-between items-center hover:bg-blue-50/50 px-3 sm:px-4 transition-colors cursor-default border-b border-gray-50 last:border-0';
+                
+                const colors = ['bg-blue-100 text-blue-600', 'bg-emerald-100 text-emerald-600', 'bg-purple-100 text-purple-600', 'bg-amber-100 text-amber-600'];
+                const colorClass = colors[item.name.length % colors.length];
+
+                li.innerHTML = `
+                    <div class="flex items-center flex-1 min-w-0 pr-3">
+                        <div class="h-10 w-10 sm:h-12 sm:w-12 rounded-full flex-shrink-0 ${colorClass} flex items-center justify-center font-bold mr-3 sm:mr-4 text-lg shadow-inner">
+                            ${item.name.charAt(0)}
+                        </div>
+                        <span class="text-gray-800 font-medium truncate text-base sm:text-lg">${item.name}</span>
+                    </div>
+                    <div class="flex flex-col items-end flex-shrink-0">
+                        <span class="text-[10px] sm:text-xs text-gray-400 mb-0.5 sm:mb-1 font-medium">เลขหน้า</span>
+                        <span class="bg-gray-800 text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-sm sm:text-base font-bold shadow-md">${item.page}</span>
+                    </div>
+                `;
+                resultsList.appendChild(li);
+            });
+        }
+
+        searchInput.addEventListener('input', (e) => performSearch(e.target.value));
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            performSearch('');
+            searchInput.focus();
+        });
+
+
+        const customerForm = document.getElementById('customerForm');
+        const nameInput = document.getElementById('nameInput');
+        const pageInput = document.getElementById('pageInput');
+        const editIdInput = document.getElementById('editId');
+        const submitBtn = document.getElementById('submitBtn');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+        const formTitle = document.getElementById('formTitle');
+        const databaseTableBody = document.getElementById('databaseTableBody');
+        const emptyDatabaseMsg = document.getElementById('emptyDatabaseMsg');
+        const filterDatabaseInput = document.getElementById('filterDatabaseInput');
+
+        function updateDatabaseUI(filterTerm = '') {
+            databaseTableBody.innerHTML = '';
+            
+            const cleanFilter = filterTerm.trim().toLowerCase();
+            const displayData = cleanFilter 
+                ? database.filter(item => item.name.toLowerCase().includes(cleanFilter))
+                : database;
+            
+            displayData.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+
+            if (displayData.length === 0) {
+                emptyDatabaseMsg.classList.remove('hidden');
+                if(cleanFilter && database.length > 0) {
+                     emptyDatabaseMsg.innerHTML = '<i class="fas fa-search text-3xl mb-2 text-gray-300"></i><span>ไม่พบชื่อที่ค้นหา</span>';
+                } else {
+                     emptyDatabaseMsg.innerHTML = '<i class="fas fa-box-open text-3xl mb-2 text-gray-300"></i><span>ยังไม่มีข้อมูล เริ่มต้นเพิ่มด้านบน</span>';
+                }
+            } else {
+                emptyDatabaseMsg.classList.add('hidden');
+                
+                displayData.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'bg-white hover:bg-gray-50 transition-colors group';
+                    tr.innerHTML = `
+                        <td class="px-4 py-2.5 font-medium text-gray-800 truncate max-w-[120px] sm:max-w-[150px]" title="${item.name}">${item.name}</td>
+                        <td class="px-4 py-2.5 text-center text-gray-600 font-mono font-medium">${item.page}</td>
+                        <td class="px-4 py-2.5 text-center">
+                            <div class="flex justify-center gap-1.5 sm:gap-2">
+                                <button onclick="editItem('${item.id}')" class="w-8 h-8 rounded bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-700 transition-colors flex items-center justify-center" title="แก้ไข">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="confirmDeleteItem('${item.id}')" class="w-8 h-8 rounded bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors flex items-center justify-center" title="ลบ">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    databaseTableBody.appendChild(tr);
+                });
+            }
+            
+            document.getElementById('totalCountDisplay').textContent = database.length;
+            if(searchInput.value) performSearch(searchInput.value);
+        }
+
+        customerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const nameVal = nameInput.value.trim();
+            const pageVal = pageInput.value.trim();
+            const currentEditId = editIdInput.value;
+
+            if (!nameVal || !pageVal) {
+                showModal("ข้อมูลไม่ครบ", "กรุณากรอกทั้งชื่อลูกค้าและเลขหน้า", "danger");
+                return;
+            }
+
+            if (currentEditId) {
+                const index = database.findIndex(item => item.id === currentEditId);
+                if (index !== -1) {
+                    database[index] = { ...database[index], name: nameVal, page: pageVal };
+                    showModal("สำเร็จ", `อัปเดตข้อมูล "${nameVal}" เรียบร้อยแล้ว`, "success");
+                }
+                resetForm();
+            } else {
+                const isDuplicate = database.some(item => item.name.toLowerCase() === nameVal.toLowerCase());
+                if(isDuplicate) {
+                     showModal("แจ้งเตือน", `ชื่อ "${nameVal}" มีในระบบแล้ว กรุณาตรวจสอบอีกครั้ง`, "danger");
+                     return;
+                }
+
+                database.push({ id: generateId(), name: nameVal, page: pageVal });
+                resetForm();
+                
+                if(!filterDatabaseInput.value) {
+                    setTimeout(() => {
+                        const tableContainer = databaseTableBody.parentElement.parentElement;
+                        tableContainer.scrollTop = tableContainer.scrollHeight;
+                    }, 100);
+                }
+            }
+
+            saveData();
+            updateDatabaseUI(filterDatabaseInput.value);
+            
+            if(window.innerWidth >= 1024) {
+                nameInput.focus();
+            }
+        });
+
+        window.editItem = function(id) {
+            const item = database.find(i => i.id === id);
+            if (item) {
+                nameInput.value = item.name;
+                pageInput.value = item.page;
+                editIdInput.value = item.id;
+                
+                formTitle.innerHTML = '<i class="fas fa-edit mr-1.5"></i>แก้ไขข้อมูล';
+                submitBtn.innerHTML = '<i class="fas fa-save mr-1.5"></i> อัปเดต';
+                submitBtn.className = 'flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition-all shadow hover:shadow-md flex justify-center items-center';
+                
+                customerForm.classList.replace('bg-emerald-50', 'bg-blue-50');
+                customerForm.classList.replace('border-emerald-100', 'border-blue-200');
+                formTitle.classList.replace('text-emerald-800', 'text-blue-800');
+                
+                cancelEditBtn.classList.remove('hidden');
+                
+                // เลื่อนหน้าจอขึ้นไปที่ฟอร์ม (สำหรับมือถือ)
+                if(window.innerWidth < 1024) {
+                    customerForm.scrollIntoView({ behavior: 'smooth' });
+                }
+                nameInput.focus();
+            }
+        };
+
+        function resetForm() {
+            nameInput.value = '';
+            pageInput.value = '';
+            editIdInput.value = '';
+            
+            formTitle.innerHTML = '<i class="fas fa-plus-circle mr-1.5"></i>เพิ่มลูกค้าใหม่';
+            submitBtn.innerHTML = '<i class="fas fa-save mr-1.5"></i> บันทึกข้อมูล';
+            submitBtn.className = 'flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition-all shadow hover:shadow-md flex justify-center items-center';
+            
+            customerForm.classList.replace('bg-blue-50', 'bg-emerald-50');
+            customerForm.classList.replace('border-blue-200', 'border-emerald-100');
+            formTitle.classList.replace('text-blue-800', 'text-emerald-800');
+            
+            cancelEditBtn.classList.add('hidden');
+        }
+
+        cancelEditBtn.addEventListener('click', resetForm);
+
+        window.confirmDeleteItem = function(id) {
+            const item = database.find(i => i.id === id);
+            if (item) {
+                showModal(
+                    "ยืนยันการลบ", 
+                    `คุณต้องการลบข้อมูลของ "${item.name}" ใช่หรือไม่? (ข้อมูลที่ลบจะไม่สามารถกู้คืนได้)`, 
+                    'confirm', 
+                    () => { deleteItem(id); }
+                );
+            }
+        };
+
+        function deleteItem(id) {
+            database = database.filter(item => item.id !== id);
+            if(editIdInput.value === id) resetForm();
+            saveData();
+            updateDatabaseUI(filterDatabaseInput.value);
+        }
+
+        filterDatabaseInput.addEventListener('input', (e) => {
+            updateDatabaseUI(e.target.value);
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if(database.length === 0) {
+                showModal("ไม่พบข้อมูล", "ยังไม่มีข้อมูลในระบบ ไม่สามารถสำรองได้", "danger");
+                return;
+            }
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(database, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            
+            const date = new Date();
+            const dateString = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+            downloadAnchorNode.setAttribute("download", `customer_data_backup_${dateString}.json`);
+            
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        });
+
+        // เริ่มการทำงาน
+        window.onload = () => {
+            loadData();
+            // ถ้าเป็นคอมพิวเตอร์ ให้ focus ช่องค้นหาเลย
+            if(window.innerWidth >= 1024) {
+                searchInput.focus();
+            }
+        };
+
+    </script>
+</body>
+</html>
